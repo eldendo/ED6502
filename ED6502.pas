@@ -8,28 +8,24 @@ unit ED6502;
 
 interface
 
-type  	readCallBack = function(address: word): byte;
-		writeCallBack = procedure(address: word; value: byte);
-		
-procedure run6502(PC:word; peek:readCallBack; poke:writeCallBack);
+type    readCallBack = function(address: word): byte;
+        writeCallBack = procedure(address: word; value: byte);
+        
+procedure run6502(peek:readCallBack; poke:writeCallBack; debug: boolean);
 
 implementation
 
-// uses memio, SysUtils, strUtils;
 uses strUtils;
 
-//const debugMax = 100000000;
-
-procedure run6502(PC:word; peek:readCallBack; poke:writeCallBack);
+procedure run6502(peek:readCallBack; poke:writeCallBack; debug: boolean);
 
 (*****************************************************************
 * 6510 registers                                                 *
 *****************************************************************)
 var
         A,X,Y,S,P,IR : byte;
-//       PC : word;
-        cnt: cardinal = 0;
-        nodbug: boolean = true;
+        PC : word;
+//        cnt: cardinal = 0;
 
 
 (******************************************************************
@@ -58,16 +54,17 @@ const inst_names: array[0..255] of string = ('BRK imp','ORA indX','ERR imm','ERR
 
 procedure dump;
 begin
-//	inc(cnt); 	if cnt > debugMax then error('more than '+intToStr(debugMax)+' cycles... probably looping');
-//	if PC=hex2Dec('3368') then nodbug := false;
-//	if nodbug then exit;
-
-    write(' PC=',hexstr(PC,4),' IR=',hexstr(IR,2));
-    write(' A=',hexstr(A,2),' X=',hexstr(X,2),
-            ' Y=',hexstr(Y,2),' S=',hexstr(S,2),
-            ' P=',binstr(P,8));
-    write('     ',hexStr(PC,4),' ',inst_names[IR]);
-    writeln
+//  inc(cnt);   if cnt > debugMax then error('more than '+intToStr(debugMax)+' cycles... probably looping');
+//  if PC=hex2Dec('3368') then nodbug := false;
+    if debug then 
+        begin
+            write(' PC=',hexstr(PC,4),' IR=',hexstr(IR,2));
+            write(' A=',hexstr(A,2),' X=',hexstr(X,2),
+                    ' Y=',hexstr(Y,2),' S=',hexstr(S,2),
+                    ' P=',binstr(P,8));
+            write('     ',hexStr(PC,4),' ',inst_names[IR]);
+            writeln
+        end
 end;
 
 (******************************************************************
@@ -195,8 +192,8 @@ end;
 
 procedure adc (address : word);
 var     
-		AL,AH : byte;
-		HC: boolean;
+        AL,AH : byte;
+        HC: boolean;
         val : byte;
 begin
         val := peek(address);
@@ -209,43 +206,43 @@ begin
         setFlag(V,boolean((not (A xor val) and $80) and ((A xor AH*16) and  $80)));
         A := AH*16+(AL and $0F);
         if flagset(D) then
-			begin
-//				error('halted in ADC with D set');
-				if HC then AL := (AL+6) and $0F;
-				if flagSet(C) then AH := (AH+6) and $0F;
-				A := AH*16+(AL and $0F)
-			end;
-		setflag(Z,A = 0);
+            begin
+//              error('halted in ADC with D set');
+                if HC then AL := (AL+6) and $0F;
+                if flagSet(C) then AH := (AH+6) and $0F;
+                A := AH*16+(AL and $0F)
+            end;
+        setflag(Z,A = 0);
         setflag(N,A >= $80);
        
 end; 
 
 procedure sbc (address : word);
 var     
-		AL,AH : byte;
-		HC: boolean;
+        AL,AH : byte;
+        HC: boolean;
         val : byte;
 begin
-		val := peek(address) xor $FF;
-	    AL := A and $0F + val and $0F;
+        val := peek(address) xor $FF;
+        AL := A and $0F + val and $0F;
         if flagset(C) then inc(AL);
 //        if flagSet(D) then HC := AL > 9 else HC := AL > $F; 
-		HC := AL > $F;
+        HC := AL > $F;
         AH := (A and $F0)>>4 + (val and $F0)>>4;
         if HC then inc(AH); 
 //        if flagSet(D) then setFlag(C,AH > 9) else setFlag(C,AH > $F); 
-		setFlag(C,AH > $F);
+        setFlag(C,AH > $F);
         setFlag(V,boolean((not (A xor val) and $80) and ((A xor AH*16) and  $80)));
         A := AH*16+(AL and $0F);
         if flagset(D) then
-			begin
-//				error('halted in SBC with D set');
-				if not HC then AL := (AL+10) and $0F;
-				if not FlagSet(C) then AH := (AH+10) and $0F;
-				A := AH*16+(AL and $0F);
-//				writeln(AH,' ',AL,' ',A);
-			end;
-		setflag(Z,A = 0);
+            begin
+//              error('halted in SBC with D set');
+                if not HC then AL := (AL+10) and $0F;
+                if not FlagSet(C) then AH := (AH+10) and $0F;
+                A := AH*16+(AL and $0F);
+//              writeln(AH,' ',AL,' ',A);
+            end;
+        setflag(Z,A = 0);
         setflag(N,A >= $80);
 end;
 
@@ -253,7 +250,7 @@ end;
 procedure sbc (address : word);
 var     H : word;
         val : byte;
-		DHC: boolean;
+        DHC: boolean;
         AL: Byte;
 begin
         val := peek(address);
@@ -265,13 +262,13 @@ begin
         if flagSet(D) then setflag(C,H<=99) else setflag(C,H<=$FF);    
         A:=H;   
         if flagset(D) then
-			begin
-				setflag(C,H <= 99);
-				AL := A and $0F;
-				if AL > 9 then AL:=AL+$A;
-				if not flagset(C) then A:=A+$A0;
-				A := (A and $F0) + AL
-			end;
+            begin
+                setflag(C,H <= 99);
+                AL := A and $0F;
+                if AL > 9 then AL:=AL+$A;
+                if not flagset(C) then A:=A+$A0;
+                A := (A and $F0) + AL
+            end;
         setflag(Z,A=0);
         setflag(N,A>=$80);
 end;
@@ -641,8 +638,8 @@ begin
     writeln('(c) 2006 ir. Marc Dendooven');
     writeln('--------------------------------------');
 
-//    PC := peek2($FFFC);
-//	PC := $400;
+    PC := peek2($FFFC);
+//  PC := $400;
     while true do
         begin
             IR := peek(PC);
